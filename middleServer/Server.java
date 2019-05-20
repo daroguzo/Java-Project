@@ -15,27 +15,24 @@ import java.util.Set;
 import javax.swing.text.html.HTMLDocument.Iterator;
 import java.util.Iterator.*;
 public class Server {
-	static int room1 = 0;
-	static int room2 = 0;
-	static int room3 = 0;
-	static HashMap<String, Object> hash;
+	int room1 = 0;
+	int room2 = 0;
+	int room3 = 0;
+	HashMap<String, PrintWriter> hash;
 	//static PrintWriter pwr;
-	public static void main(String[] args) {
-		//제어서버에 보낼 때 사용할 socket,pw
-		Socket controlSck = null;
-		PrintWriter pwr = null;
-		
+	//제어서버에 보낼 때 사용할 socket,pw
+	Socket controlSck = null;
+	PrintWriter pwr = null;
+	public Server() {
 		try {
 			//제어서버에 socket연결
-			controlSck = new Socket("192.168.0.18",10001);
+			controlSck = new Socket("localhost",10001);
 			pwr = new PrintWriter(new OutputStreamWriter(controlSck.getOutputStream()));
 			ControlThread control = new ControlThread(controlSck, pwr);
 			control.start();
-			
-			
-			
+				
 			ServerSocket server = new ServerSocket(1525);
-			hash = new HashMap<String, Object>();
+			hash = new HashMap<String, PrintWriter>();
 			//hash맵 키값불러와서 각 방마다 몇명인지 구하기
 			
 			
@@ -46,8 +43,7 @@ public class Server {
 				System.out.println("현재 서버에   "+hash.size()+"명...");
 				//hash맵 개수 구하기
 				
-				
-				
+
 				/*
 				 * System.out.println("100번방:  "+room1+"명...");
 				 * System.out.println("101번방:  "+room2+"명...");
@@ -58,14 +54,17 @@ public class Server {
 				ChatThread chatThr = new ChatThread(sck, hash);
 				chatThr.start();
 				
-				
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
 	}
+	public static void main(String[] args) {
+		new Server();
+	}
+	
+
 }
 //제어서버와 연결되는 스레드
 class ControlThread extends Thread
@@ -117,9 +116,9 @@ class ChatThread extends Thread{
 	String [] split;
 	String code;
 	BufferedReader br;
-	HashMap<String, Object> hash;
+	HashMap<String, PrintWriter> hash;
 	boolean initFlag = false;
-	public ChatThread(Socket sck,HashMap<String, Object> hash) {
+	public ChatThread(Socket sck,HashMap<String, PrintWriter> hash) {
 		
 		this.sck = sck;
 		this.hash = hash;
@@ -135,8 +134,8 @@ class ChatThread extends Thread{
 			split = code.split("/");
 			System.out.println("===="+split[1]+"님과 성공적으로 연결("+split[0]+"번방)");
 			
-				
-			broadcast(split[1]+"is connected.");
+			
+			//broadcast(split[1]+"is connected.");
 			synchronized (hash) {//직렬화 후 해쉬맵에 저장
 				hash.put(code, pw);
 			}
@@ -148,28 +147,43 @@ class ChatThread extends Thread{
 			
 	}
 	public void run() {
-		String line = null;
+		String line;
+		/*
+		 * msg 형식
+		 * 일련번호/a|p/msg
+		 */
 		try {
-			while((line = br.readLine()) != null)
-			{//클라이언트로부터 quit을 받으면 종료
-				if(line.split("/")[0].equals("quit"))
-				{
-					System.out.println(split[1]+"님이 시스탬을 종료합니다...");
-					break;
+			while((line = br.readLine()) != null) {
+				String[] split = line.split("/");
+				// 일련번호가 같을 경우
+				if(split[0].equals(code)) {
+					// 안드로이드에서 송신
+					if(split[1].equals("a")) {
+						// 상대편으로 저장
+						split[1] = "p";
+						//split[2] = "명령어";
+						// 확인
+						System.out.println(line);
 					
-				}else
-				{//아닐 경우 계속 읽어온 데이터를 클라이언트들에게 전송
-					broadcast(line);
+					}// pc에서 송신
+					else if(split[1].equals("p")) {
+						// 상대편으로 저장
+						split[1] = "a";
+						//split[2] = "명령어";
+						// 확인
+						System.out.println(line);
+					}
+				}else {
+					// 일련번호가 없다면 Do Nothing
 				}
 			}
 		} catch (IOException e) {
-			System.out.println(split[1]+"님이 시스탬을 강제적으로 종료합니다...");
-		}finally
-		{
+			System.out.println(split[0] + split[1] +"님이 시스탬을 강제적으로 종료합니다...");
+		}finally {
 			//제어서버에 "relay server/decrease" 보내기
 			
 			
-			broadcast(split[1]+"is disconnected...");
+			//broadcast(split[1]+"is disconnected...");
 			
 			synchronized (hash) {
 				hash.remove(code);
@@ -187,6 +201,7 @@ class ChatThread extends Thread{
 			}
 		}
 	}
+	/*
 	//메시지 전송
 	public void broadcast(String msg)
 	{
@@ -209,4 +224,5 @@ class ChatThread extends Thread{
 			}
 		}
 	}
+	*/
 }
